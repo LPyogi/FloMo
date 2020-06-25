@@ -2,24 +2,26 @@ import tweepy
 import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import preprocessor as p
 
-
-# use creds to create a client to interact with the Google Drive API
 scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
 creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
 client = gspread.authorize(creds)
 
-# Find a workbook by name and open the first sheet
-# Make sure you use the right name here.
+
 sheet = client.open("Hello World").sheet1
-row = ["Text","Geolocation","Coordinates","Location","TimeStamp","Username","Tweet Id","Media Type","Media Url1","Media Url2","Extended Media type","Extended Media Url","Hashtag1","Hashtag2","Hashtag3","Website1","Website2","Mention1","Mention2","Mention3","Media Url3","Media Url4"]
-sheet.insert_row(row)
+row = ["Tweet url","Text","Geolocation","Coordinates","Location","TimeStamp","Username","Tweet Id","Media Type","Media Url1","Media Url2","Extended Media type","Extended Media Url","Hashtag1","Hashtag2","Hashtag3","Website1","Website2","Mention1","Mention2","Mention3","Media Url3","Media Url4"]
+sheet.insert_row(row,1)
+tweet_count = 1
 class StreamListener(tweepy.StreamListener):
 
     def on_status(self, status):
+        global tweet_count
         text = status.text
         if text.startswith("RT @") == True:
             return
+        text = p.clean(text)
+        tweet_count = tweet_count + 1
         loc = status.user.location
         coords = status.coordinates
         geo = status.geo
@@ -29,6 +31,7 @@ class StreamListener(tweepy.StreamListener):
         created = json.dumps(created, indent=4, sort_keys=True, default=str)
         if(status.truncated):
             text = status.extended_tweet["full_text"]
+            text = p.clean(text)
             try:
                 hash = status.extended_tweet["entities"]["hashtags"][0]["text"]
             except:
@@ -219,8 +222,9 @@ class StreamListener(tweepy.StreamListener):
                 mediae_url = json.dumps(mediae_url)
             if me_type is not None:
                 me_type = json.dumps(me_type)
-        data = [text,geo,coords,loc,created,name,id_str,m_type,media_url,media_url1,me_type,mediae_url,hash,hash1,hash2,website,website1,mention,mention1,mention2,media_url2,media_url3]
-        sheet.insert_row(data)
+        tweet_url = "https://twitter.com/"+name+"/status/"+id_str
+        data = [tweet_url,text,geo,coords,loc,created,name,id_str,m_type,media_url,media_url1,me_type,mediae_url,hash,hash1,hash2,website,website1,mention,mention1,mention2,media_url2,media_url3]
+        sheet.insert_row(data,tweet_count)
     def on_error(self, status_code):
         if status_code == 420:
             #returning False in on_data disconnects the stream
